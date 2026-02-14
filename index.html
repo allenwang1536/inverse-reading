@@ -413,40 +413,42 @@
         </div>
       </div>
 
-      <div class="panel" id="draftPanel" style="display:none;">
-        <h2>Your answer (editable) <span class="muted">update as you go</span></h2>
-        <label for="draftBox">Draft</label>
-        <textarea id="draftBox" placeholder="Write what you think the answer is..."></textarea>
-      </div>
+<!-- CURRENT CHECK (now on top) -->
+<div class="panel" id="checkPanel" style="display:none;">
+  <h2>Current check <span class="muted">one at a time</span></h2>
 
-      <div class="panel" id="checkPanel" style="display:none;">
-        <h2>Current check <span class="muted">one at a time</span></h2>
+  <div class="kpis" style="margin-bottom:10px;">
+    <div class="kpi"><b id="kpiAsked">0</b> asked</div>
+    <div class="kpi"><b id="kpiMax">6</b> max</div>
+    <div class="kpi"><b id="kpiMissing">–</b> missing</div>
+  </div>
 
-        <div class="kpis" style="margin-bottom:10px;">
-          <div class="kpi"><b id="kpiAsked">0</b> asked</div>
-          <div class="kpi"><b id="kpiMax">6</b> max</div>
-          <div class="kpi"><b id="kpiMissing">–</b> missing</div>
-        </div>
+  <div style="border:1px solid var(--border); background:rgba(122,167,255,.08); border-radius:12px; padding:10px;">
+    <div class="tiny" style="margin-bottom:6px; color:var(--muted);">System asks</div>
+    <div id="currentQuestion" style="font-size:12.8px;"></div>
+  </div>
 
-        <div style="border:1px solid var(--border); background:rgba(122,167,255,.08); border-radius:12px; padding:10px;">
-          <div class="tiny" style="margin-bottom:6px; color:var(--muted);">System asks</div>
-          <div id="currentQuestion" style="font-size:12.8px;"></div>
-        </div>
+  <div class="row" style="margin-top:10px;">
+    <div style="flex:1 1 280px;">
+      <label for="checkReply">Your reply to this check</label>
+      <input id="checkReply" type="text" placeholder="Type your reply..." />
+    </div>
+  </div>
+</div>
 
-        <div class="row" style="margin-top:10px;">
-          <div style="flex:1 1 280px;">
-            <label for="checkReply">Your reply to this check</label>
-            <input id="checkReply" type="text" placeholder="Type your reply..." />
-          </div>
-        </div>
+<!-- YOUR ANSWER (now bottom, submit stays here) -->
+<div class="panel" id="draftPanel" style="display:none;">
+  <h2>Your answer (editable) <span class="muted">update as you go</span></h2>
+  <label for="draftBox">Draft</label>
+  <textarea id="draftBox" placeholder="Write what you think the answer is..."></textarea>
 
-        <div class="row">
-          <button class="primary" id="submitReplyBtn">Submit</button>
-          <button class="ghost" id="skipBtn">Skip</button>
-          <span class="spacer"></span>
-          <span class="tiny" id="hintLine"></span>
-        </div>
-      </div>
+  <div class="row">
+    <button class="primary" id="submitReplyBtn">Submit</button>
+    <button class="ghost" id="skipBtn">Skip</button>
+    <span class="spacer"></span>
+    <span class="tiny" id="hintLine"></span>
+  </div>
+</div>
     </div>
   </section>
 </main>

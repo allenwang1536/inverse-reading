@@ -1,0 +1,897 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Inverse Reading Augmentation </title>
+  <style>
+    :root{
+      --bg:#0b0c10;
+      --panel:#12141b;
+      --panel2:#161925;
+      --text:#e9eefc;
+      --muted:#a9b3cc;
+      --border:rgba(255,255,255,.10);
+      --border2:rgba(255,255,255,.16);
+      --accent:#7aa7ff;
+      --shadow: 0 12px 40px rgba(0,0,0,.45);
+      --radius:14px;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+    *{ box-sizing:border-box; }
+    html, body{ height:100%; }
+    body{
+      margin:0;
+      font-family: var(--sans);
+      color: var(--text);
+      background:
+        radial-gradient(1100px 700px at 15% 10%, rgba(122,167,255,.12), transparent 60%),
+        radial-gradient(900px 600px at 85% 20%, rgba(169,240,209,.10), transparent 55%),
+        var(--bg);
+    }
+    header{
+      padding:14px 16px;
+      border-bottom:1px solid var(--border);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+    }
+    header .left h1{ margin:0; font-size:14px; font-weight:650; }
+    header .left p{ margin:4px 0 0; font-size:12px; color:var(--muted); }
+    header .right{
+      display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end;
+      color:var(--muted); font-size:12px;
+    }
+
+    main{
+      height: calc(100% - 58px);
+      display:grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap:12px;
+      padding:12px;
+      min-height:0;
+    }
+
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.03));
+      border:1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+      min-height:0;
+    }
+
+    .topbar{
+      padding:10px 12px;
+      border-bottom:1px solid var(--border);
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+    }
+    .meta .name{ font-size:12px; font-weight:650; }
+    .meta .sub{ font-size:12px; color:var(--muted); margin-top:2px; }
+
+    .btnRow{ display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+
+    button{
+      appearance:none;
+      border:1px solid var(--border2);
+      background: rgba(255,255,255,.04);
+      color: var(--text);
+      padding:8px 10px;
+      border-radius: 10px;
+      font-size: 12px;
+      cursor:pointer;
+      transition: transform .06s ease, background .12s ease;
+    }
+    button:hover{ background: rgba(255,255,255,.07); }
+    button:active{ transform: translateY(1px); }
+    button.primary{
+      border-color: rgba(122,167,255,.45);
+      background: rgba(122,167,255,.10);
+    }
+    button.ghost{ background: transparent; border-color: var(--border); color: var(--muted); }
+    button.danger{
+      border-color: rgba(255,122,122,.55);
+      background: rgba(255,122,122,.10);
+    }
+
+    /* Left: PDF */
+    .pdfBody{
+      padding:12px;
+      overflow:auto;
+      min-height:0;
+    }
+    .page{
+      max-width: 880px;
+      margin:0 auto;
+      padding:14px;
+      border:1px solid var(--border);
+      border-radius: 12px;
+      background: rgba(255,255,255,.03);
+    }
+    .para{
+      margin: 10px 0;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      position:relative;
+      font-size:13px;
+      color: rgba(233,238,252,.94);
+    }
+    .para .tag{
+      position:absolute;
+      top:-10px; right:10px;
+      font-size:11px;
+      color:var(--muted);
+      background: rgba(0,0,0,.35);
+      border:1px solid var(--border);
+      padding:2px 7px;
+      border-radius: 999px;
+      display:none;
+    }
+    .relevant{
+      border-color: rgba(122,167,255,.35);
+      background: rgba(122,167,255,.08);
+      box-shadow: 0 0 0 1px rgba(122,167,255,.15) inset;
+    }
+    .relevant .tag{ display:inline-flex; }
+    .relevant::before{
+      content:"";
+      position:absolute;
+      left:-6px; top:10px; bottom:10px;
+      width:3px;
+      border-radius: 99px;
+      background: var(--accent);
+    }
+    .hi{
+      background: rgba(255,207,110,.22);
+      border-radius: 4px;
+      padding: 0 2px;
+    }
+    .blurIrrelevant .para:not(.relevant){
+      filter: blur(4px);
+      opacity:.55;
+      user-select:none;
+      pointer-events:none;
+    }
+
+    /* Context: prerequisites (BEFORE reading evidence) */
+    .contextCard{
+      margin-top:12px;
+      border:1px solid var(--border);
+      border-radius: 12px;
+      overflow:hidden;
+      background: rgba(18,20,27,.72);
+    }
+    .contextHead{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      padding:10px 12px;
+    }
+    .contextHead .title{
+      font-size:12px;
+      color: var(--muted);
+      display:flex;
+      gap:8px;
+      align-items:center;
+      min-width:0;
+    }
+    .chip{
+      font-size:11px;
+      padding:3px 8px;
+      border-radius: 999px;
+      border:1px solid rgba(169,240,209,.35);
+      background: rgba(169,240,209,.10);
+      color: var(--text);
+      flex:0 0 auto;
+    }
+    .contextBody{
+      display:none;
+      padding:10px 12px 12px;
+      border-top:1px solid var(--border);
+      color: rgba(233,238,252,.92);
+      font-size:12px;
+    }
+    .contextCard.open .contextBody{ display:block; }
+    .contextBody ul{ margin:8px 0 0 18px; padding:0; color:var(--muted); }
+    .contextBody li{ margin:6px 0; }
+
+    /* Right: light interaction */
+    .rightBody{
+      padding:12px;
+      overflow:auto;
+      min-height:0;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    .panel{
+      border:1px solid var(--border);
+      border-radius: 12px;
+      background: rgba(255,255,255,.03);
+      padding:12px;
+    }
+    .panel h2{
+      margin:0 0 10px;
+      font-size:12px;
+      font-weight:650;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .muted{ color:var(--muted); font-size:12px; }
+    label{ display:block; font-size:12px; color:var(--muted); margin-bottom:6px; }
+    textarea, input[type="text"], input[type="number"]{
+      width:100%;
+      border:1px solid var(--border2);
+      background: rgba(0,0,0,.25);
+      color: var(--text);
+      padding:10px 10px;
+      border-radius: 12px;
+      outline:none;
+      font-size:12.5px;
+      font-family: var(--sans);
+    }
+    textarea{ min-height: 92px; resize: vertical; }
+    .row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px; }
+    .row .spacer{ flex: 1 1 auto; }
+    .tiny{ font-size:11px; color:var(--muted); }
+    .kpis{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+    .kpi{
+      border:1px solid var(--border);
+      background: rgba(0,0,0,.18);
+      border-radius: 12px;
+      padding:7px 9px;
+      font-size:12px;
+      color: var(--muted);
+    }
+    .kpi b{ color: var(--text); font-weight:650; }
+
+    /* Modal (settings) */
+    .modalBackdrop{
+      position:fixed;
+      inset:0;
+      background: rgba(0,0,0,.55);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:16px;
+    }
+    .modalBackdrop.open{ display:flex; }
+    .modal{
+      width:min(520px, 100%);
+      border:1px solid var(--border);
+      background: rgba(18,20,27,.92);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      overflow:hidden;
+      backdrop-filter: blur(10px);
+    }
+    .modalTop{
+      padding:10px 12px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      border-bottom:1px solid var(--border);
+    }
+    .modalTop .title{ font-size:12px; font-weight:650; }
+    .modalBody{ padding:12px; }
+    .grid2{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+    .help{
+      font-size:12px;
+      color: var(--muted);
+      margin-top:10px;
+      line-height:1.35;
+    }
+
+    @media (max-width: 980px){
+      main{ grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div class="left">
+    <h1>Inverse Reading Augmentation</h1>
+    <p>Evidence highlight + one neutral check at a time</p>
+  </div>
+  <div class="right">
+    <span id="statusLine">Ask a question to begin</span>
+    <button class="ghost" id="openSettingsBtn">Settings</button>
+    <button class="ghost" id="resetBtn">Reset</button>
+  </div>
+</header>
+
+<main>
+  <!-- LEFT: PDF -->
+  <section class="card" id="pdfCard">
+    <div class="topbar">
+      <div class="meta">
+        <div class="name">Example PDF: “Raft Consensus (Implementation Notes, Excerpt)”</div>
+        <div class="sub">Highlighted blocks are what the system uses. Others can be blurred.</div>
+      </div>
+      <div class="btnRow">
+        <button class="ghost" id="toggleBlurBtn">Toggle blur</button>
+        <button class="primary" id="toggleContextBtn">Toggle pre-read context</button>
+      </div>
+    </div>
+
+    <div class="pdfBody blurIrrelevant" id="pdfBody">
+      <div class="page">
+        <div class="para" data-id="p1">
+          This excerpt summarizes parts of the Raft protocol. It is not a full specification.
+          Some operational details (timeouts, batching) are omitted.
+        </div>
+
+        <div class="para relevant" data-id="p2">
+          <span class="tag">Evidence A</span>
+          <b>Leader election safety.</b> A server grants its vote to at most one candidate per term.
+          A candidate must receive votes from a <span class="hi">majority</span> of servers to become leader.
+        </div>
+
+        <div class="para relevant" data-id="p3">
+          <span class="tag">Evidence B</span>
+          <b>Log matching property.</b> If two logs contain an entry with the same
+          <span class="hi">index</span> and <span class="hi">term</span>, then the logs are identical in all entries up through that index.
+        </div>
+
+        <div class="para" data-id="p4">
+          Heartbeats are empty AppendEntries RPCs used to maintain leadership. Implementations should randomize timeouts.
+        </div>
+
+        <div class="para relevant" data-id="p5">
+          <span class="tag">Evidence C</span>
+          <b>Commit rule.</b> A leader considers an entry committed once it is stored on a
+          <span class="hi">majority</span> of servers. For linearizable reads, the leader must ensure it still holds authority,
+          typically by communicating with a majority.
+        </div>
+
+        <div class="para" data-id="p6">
+          Snapshots compact the log. Followers can install snapshots to catch up quickly when far behind.
+        </div>
+
+        <!-- Pre-read context: prerequisites (not summarizing evidence) -->
+        <div class="contextCard" id="contextCard">
+          <div class="contextHead">
+            <div class="title">
+              <span class="chip">Pre-read</span>
+              <span>Concepts you should know before reading the highlighted blocks</span>
+            </div>
+            <button class="ghost" id="contextToggleBtn">Open</button>
+          </div>
+          <div class="contextBody">
+            <div><b>Minimum prerequisites:</b></div>
+            <ul>
+              <li><b>Term:</b> a monotonically increasing epoch number used to order leadership and elections.</li>
+              <li><b>Majority:</b> more than half of the cluster. Guarantees overlap between quorums.</li>
+              <li><b>Index:</b> position of an entry in the replicated log (1..N).</li>
+              <li><b>Linearizable read:</b> read that reflects the latest committed writes, as if there were one copy.</li>
+            </ul>
+            <div class="help">This is intentionally general so it helps you interpret evidence, not replace it.</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- RIGHT: Flow -->
+  <section class="card">
+    <div class="topbar">
+      <div class="meta">
+        <div class="name" id="phaseTitle">Step 1: Enter a question</div>
+        <div class="sub" id="phaseSub">You’ll get one neutral check at a time.</div>
+      </div>
+      <div class="btnRow">
+        <button class="danger" id="revealBtn" disabled>Reveal system answer</button>
+      </div>
+    </div>
+
+    <div class="rightBody">
+      <div class="panel" id="askPanel">
+        <h2>Question <span class="muted">about the PDF</span></h2>
+        <label for="questionInput">Your question</label>
+        <textarea id="questionInput" placeholder="Example: What conditions make a Raft leader election safe, and how does Raft ensure logs don't diverge?"></textarea>
+        <div class="row">
+          <button class="primary" id="startBtn">Start</button>
+          <span class="spacer"></span>
+          <span class="tiny">Mock logic. No model.</span>
+        </div>
+      </div>
+
+      <div class="panel" id="draftPanel" style="display:none;">
+        <h2>Your answer (editable) <span class="muted">update as you go</span></h2>
+        <label for="draftBox">Draft</label>
+        <textarea id="draftBox" placeholder="Write what you think the answer is..."></textarea>
+      </div>
+
+      <div class="panel" id="checkPanel" style="display:none;">
+        <h2>Current check <span class="muted">one at a time</span></h2>
+
+        <div class="kpis" style="margin-bottom:10px;">
+          <div class="kpi"><b id="kpiAsked">0</b> asked</div>
+          <div class="kpi"><b id="kpiMax">6</b> max</div>
+          <div class="kpi"><b id="kpiMissing">–</b> missing</div>
+        </div>
+
+        <div style="border:1px solid var(--border); background:rgba(122,167,255,.08); border-radius:12px; padding:10px;">
+          <div class="tiny" style="margin-bottom:6px; color:var(--muted);">System asks</div>
+          <div id="currentQuestion" style="font-size:12.8px;"></div>
+        </div>
+
+        <div class="row" style="margin-top:10px;">
+          <div style="flex:1 1 280px;">
+            <label for="checkReply">Your reply to this check</label>
+            <input id="checkReply" type="text" placeholder="Type your reply..." />
+          </div>
+        </div>
+
+        <div class="row">
+          <button class="primary" id="submitReplyBtn">Submit</button>
+          <button class="ghost" id="skipBtn">Skip</button>
+          <span class="spacer"></span>
+          <span class="tiny" id="hintLine"></span>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- Settings modal -->
+<div class="modalBackdrop" id="settingsBackdrop" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Settings">
+    <div class="modalTop">
+      <div class="title">Settings</div>
+      <button class="ghost" id="closeSettingsBtn">Close</button>
+    </div>
+    <div class="modalBody">
+      <div class="grid2">
+        <div>
+          <label for="perDiffInput">Questions per difference</label>
+          <input id="perDiffInput" type="number" min="1" max="5" value="2" />
+          <div class="help">If a key idea is missing, ask up to this many checks about that missing idea before moving on.</div>
+        </div>
+        <div>
+          <label for="maxTotalInput">Max total questions</label>
+          <input id="maxTotalInput" type="number" min="1" max="20" value="6" />
+          <div class="help">Hard stop. If you hit this limit, the system reveals its answer.</div>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:12px;">
+        <button class="primary" id="saveSettingsBtn">Save</button>
+        <span class="spacer"></span>
+        <span class="tiny">Applies to the next run (or immediately if already running).</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  /**
+   * Requirements implemented:
+   * - Pre-read context is prerequisite knowledge, not a summary of evidence.
+   * - Only ONE clarifying question shown at a time (no chat transcript).
+   * - Settings: (1) questions per difference, (2) overall max questions.
+   * - Technical PDF text where evidence highlighting is useful (Raft excerpt).
+   * - Light mock UI.
+   */
+
+  // Settings (user-adjustable)
+  const settings = {
+    perDifferenceMax: 2,
+    overallMax: 6
+  };
+
+  // Simple rubric (key ideas the draft should contain)
+  const FACTS = [
+    {
+      id: "vote_once_majority",
+      label: "Election safety: vote at most once per term + majority needed",
+      needles: ["one candidate per term", "at most one", "one vote per term", "majority", "receive votes"]
+    },
+    {
+      id: "log_matching",
+      label: "Log matching: same index+term implies identical prefix",
+      needles: ["same index", "same term", "identical", "up through that index", "prefix"]
+    },
+    {
+      id: "commit_majority",
+      label: "Commit rule: entry committed once stored on a majority",
+      needles: ["committed", "stored", "majority", "considered an entry committed"]
+    }
+  ];
+
+  // Neutral question templates per missing fact (no leading values).
+  const QUESTION_BANK = {
+    vote_once_majority: [
+      "What does the excerpt require for a candidate to become leader? Answer using the highlighted wording.",
+      "In the excerpt, what constraint exists on voting per term, and what threshold is needed to win an election?"
+    ],
+    log_matching: [
+      "What condition makes two logs identical up through an index in the excerpt?",
+      "According to the highlighted text, what does matching index and term imply about the preceding entries?"
+    ],
+    commit_majority: [
+      "What does the excerpt say must be true before a leader considers an entry committed?",
+      "In the highlighted commit rule, what cluster condition is required before an entry is treated as committed?"
+    ],
+    synthesis: [
+      "Summarize the answer in 2–3 sentences, tying election safety, log matching, and commit behavior together.",
+      "Can you restate your final answer, with each claim backed by the highlighted lines?"
+    ]
+  };
+
+  // Internal "system answer" (hidden unless reveal/stop)
+  function internalAnswer(){
+    return [
+      "Leader election is safe here because a server grants its vote to at most one candidate per term and a candidate must win a majority to become leader.",
+      "Raft prevents log divergence via the log matching property: if two logs share an entry with the same index and term, their prefixes match up through that index.",
+      "A leader treats an entry as committed once it is stored on a majority of servers (and linearizable reads require confirming authority with a majority)."
+    ].join(" ");
+  }
+
+  // ---------- DOM ----------
+  const pdfBody = document.getElementById("pdfBody");
+  const toggleBlurBtn = document.getElementById("toggleBlurBtn");
+
+  const contextCard = document.getElementById("contextCard");
+  const contextToggleBtn = document.getElementById("contextToggleBtn");
+  const toggleContextBtn = document.getElementById("toggleContextBtn");
+
+  const statusLine = document.getElementById("statusLine");
+  const phaseTitle = document.getElementById("phaseTitle");
+  const phaseSub = document.getElementById("phaseSub");
+
+  const askPanel = document.getElementById("askPanel");
+  const questionInput = document.getElementById("questionInput");
+  const startBtn = document.getElementById("startBtn");
+
+  const draftPanel = document.getElementById("draftPanel");
+  const draftBox = document.getElementById("draftBox");
+
+  const checkPanel = document.getElementById("checkPanel");
+  const currentQuestionEl = document.getElementById("currentQuestion");
+  const checkReply = document.getElementById("checkReply");
+  const submitReplyBtn = document.getElementById("submitReplyBtn");
+  const skipBtn = document.getElementById("skipBtn");
+  const hintLine = document.getElementById("hintLine");
+
+  const revealBtn = document.getElementById("revealBtn");
+  const resetBtn = document.getElementById("resetBtn");
+
+  const kpiAsked = document.getElementById("kpiAsked");
+  const kpiMax = document.getElementById("kpiMax");
+  const kpiMissing = document.getElementById("kpiMissing");
+
+  // Settings modal
+  const settingsBackdrop = document.getElementById("settingsBackdrop");
+  const openSettingsBtn = document.getElementById("openSettingsBtn");
+  const closeSettingsBtn = document.getElementById("closeSettingsBtn");
+  const saveSettingsBtn = document.getElementById("saveSettingsBtn");
+  const perDiffInput = document.getElementById("perDiffInput");
+  const maxTotalInput = document.getElementById("maxTotalInput");
+
+  // ---------- State ----------
+  const state = {
+    running: false,
+    askedCount: 0,
+    lastMissingId: null,
+    perDiffCount: {}, // factId -> how many asked while missing
+    revealed: false,
+    systemAnswer: internalAnswer(),
+    currentQuestion: ""
+  };
+
+  const QUESTION_PLAN = ["vote_once_majority", "log_matching", "commit_majority", "synthesis"];
+
+state.planIndex = 0;              // which concept we are targeting
+state.questionIndexByFact = {};   // which question variant we are on per fact
+
+
+  // ---------- Helpers ----------
+  function normalize(s){
+    return (s || "").toLowerCase().replace(/\s+/g, " ").trim();
+  }
+
+  function missingFacts(draft){
+    const t = normalize(draft);
+    const missing = [];
+    for (const f of FACTS){
+      const ok = f.needles.some(n => t.includes(normalize(n)));
+      if (!ok) missing.push(f.id);
+    }
+    return missing;
+  }
+
+function pickFrom(arr, i){
+  // deterministic: always choose by index (wrap if needed)
+  return arr[i % arr.length];
+}
+  function setUIRunning(){
+    askPanel.style.display = "none";
+    draftPanel.style.display = "";
+    checkPanel.style.display = "";
+    revealBtn.disabled = false;
+
+    phaseTitle.textContent = "Step 2: Read evidence, then iterate";
+    phaseSub.textContent = "Update your draft. Answer one check. Repeat.";
+    statusLine.textContent = "Running";
+  }
+
+  function setUIStopped(label){
+    statusLine.textContent = label;
+    phaseTitle.textContent = label;
+    phaseSub.textContent = "You can compare with the system answer.";
+    currentQuestionEl.textContent = "No more checks.";
+    hintLine.textContent = "";
+  }
+
+  function updateKpis(){
+    kpiAsked.textContent = String(state.askedCount);
+    kpiMax.textContent = String(settings.overallMax);
+    const m = missingFacts(draftBox.value);
+    kpiMissing.textContent = m.length ? m.join(", ") : "none";
+  }
+
+  function reveal(reason){
+    if (state.revealed) return;
+    state.revealed = true;
+    alert("System answer (" + reason + "):\n\n" + state.systemAnswer);
+  }
+
+  function nextQuestion(){
+    updateKpis();
+
+    const m = missingFacts(draftBox.value);
+    if (m.length === 0){
+      setUIStopped("Done (converged)");
+      hintLine.textContent = "Draft contains the key ideas. You can still reveal the system answer for wording.";
+      state.running = false;
+      return;
+    }
+
+    if (state.askedCount >= settings.overallMax){
+      setUIStopped("Stopped (max questions)");
+      state.running = false;
+      revealBtn.disabled = false;
+      reveal("max questions");
+      return;
+    }
+
+    // // Choose which missing fact to probe.
+    // // If we already asked about one missing fact settings.perDifferenceMax times,
+    // // move to the next missing one.
+    // let target = m[0];
+    // for (const id of m){
+    //   const used = state.perDiffCount[id] || 0;
+    //   if (used < settings.perDifferenceMax){
+    //     target = id;
+    //     break;
+    //   }
+    // }
+
+    // // If all missing facts exceeded per-diff cap, ask synthesis anyway (or reveal if near cap).
+    // let q;
+    // if ((state.perDiffCount[target] || 0) >= settings.perDifferenceMax){
+    //   q = pickFrom(QUESTION_BANK.synthesis);
+    //   state.lastMissingId = null;
+    // } else {
+    //   q = pickFrom(QUESTION_BANK[target]);
+    //   state.lastMissingId = target;
+    // }
+
+    // Deterministic: walk a fixed plan until all missing are covered, then synthesis.
+let target = null;
+
+// advance planIndex until it points at a missing fact (or synthesis at end)
+while (state.planIndex < QUESTION_PLAN.length - 1) {
+  const candidate = QUESTION_PLAN[state.planIndex];
+  if (m.includes(candidate)) { target = candidate; break; }
+  state.planIndex += 1;
+}
+
+let q;
+
+// If still missing something but planIndex passed all, fall back to first missing
+if (!target && m.length) target = m[0];
+
+if (!target) {
+  // no missing: ask synthesis once (deterministic)
+  const idx = state.questionIndexByFact["synthesis"] || 0;
+  q = pickFrom(QUESTION_BANK.synthesis, idx);
+  state.questionIndexByFact["synthesis"] = idx + 1;
+  state.lastMissingId = null;
+} else {
+  // ask N times per missing concept, deterministically cycling variants
+  const used = state.perDiffCount[target] || 0;
+
+  if (used >= settings.perDifferenceMax) {
+    // concept exhausted, move plan forward
+    state.planIndex += 1;
+    return nextQuestion();
+  }
+
+  const idx = state.questionIndexByFact[target] || 0;
+  q = pickFrom(QUESTION_BANK[target], idx);
+  state.questionIndexByFact[target] = idx + 1;
+  state.lastMissingId = target;
+}
+
+
+    state.currentQuestion = q;
+    currentQuestionEl.textContent = q;
+
+    hintLine.textContent =
+      state.lastMissingId
+        ? ("Focus: " + state.lastMissingId.replaceAll("_"," "))
+        : "Focus: synthesis";
+
+    checkReply.value = "";
+    checkReply.focus();
+  }
+
+  function consumeTurn(){
+    // We intentionally DO NOT auto-edit the draft from the check reply.
+    // The user must update their draft box themselves.
+    // This matches the “force thinking” goal.
+    state.askedCount += 1;
+
+    if (state.lastMissingId){
+      state.perDiffCount[state.lastMissingId] = (state.perDiffCount[state.lastMissingId] || 0) + 1;
+    }
+    updateKpis();
+    nextQuestion();
+  }
+
+  // ---------- Events ----------
+  toggleBlurBtn.addEventListener("click", () => {
+    pdfBody.classList.toggle("blurIrrelevant");
+  });
+
+  function toggleContext(){
+    contextCard.classList.toggle("open");
+    contextToggleBtn.textContent = contextCard.classList.contains("open") ? "Close" : "Open";
+  }
+  contextToggleBtn.addEventListener("click", toggleContext);
+  toggleContextBtn.addEventListener("click", toggleContext);
+
+  startBtn.addEventListener("click", () => {
+    state.planIndex = 0;
+    state.questionIndexByFact = {};
+    const q = questionInput.value.trim();
+    if (!q) { alert("Enter a question first."); return; }
+
+    // Set reading posture: blur irrelevant + open prerequisites
+    pdfBody.classList.add("blurIrrelevant");
+    contextCard.classList.add("open");
+    contextToggleBtn.textContent = "Close";
+
+    state.running = true;
+    state.askedCount = 0;
+    state.perDiffCount = {};
+    state.revealed = false;
+
+    setUIRunning();
+
+    // Light scaffold in the draft box to reduce blank friction
+    draftBox.value =
+      "Election safety: ...\n" +
+      "Log matching: ...\n" +
+      "Commit behavior: ...\n" +
+      "\n(Write the answer in your own words, backed by highlighted lines.)";
+
+    // First question is always about extracting exact constraints (neutral, but targeted)
+    state.currentQuestion = "Before answering, what exact phrases in the highlighted lines support your claims?";
+    currentQuestionEl.textContent = state.currentQuestion;
+    hintLine.textContent = "Focus: cite wording";
+    updateKpis();
+    checkReply.focus();
+  });
+
+  submitReplyBtn.addEventListener("click", () => {
+    if (!state.running) return;
+    consumeTurn();
+  });
+
+  checkReply.addEventListener("keydown", (e) => {
+    if (e.key === "Enter"){
+      e.preventDefault();
+      submitReplyBtn.click();
+    }
+  });
+
+  skipBtn.addEventListener("click", () => {
+    if (!state.running) return;
+    consumeTurn();
+  });
+
+  revealBtn.addEventListener("click", () => {
+    reveal("manual");
+  });
+
+  resetBtn.addEventListener("click", () => resetAll());
+
+  // Settings modal
+  openSettingsBtn.addEventListener("click", () => {
+    perDiffInput.value = String(settings.perDifferenceMax);
+    maxTotalInput.value = String(settings.overallMax);
+    settingsBackdrop.classList.add("open");
+    settingsBackdrop.setAttribute("aria-hidden", "false");
+  });
+  closeSettingsBtn.addEventListener("click", () => {
+    settingsBackdrop.classList.remove("open");
+    settingsBackdrop.setAttribute("aria-hidden", "true");
+  });
+  settingsBackdrop.addEventListener("click", (e) => {
+    if (e.target === settingsBackdrop) closeSettingsBtn.click();
+  });
+  saveSettingsBtn.addEventListener("click", () => {
+    const pd = Math.max(1, Math.min(5, Number(perDiffInput.value || 2)));
+    const mx = Math.max(1, Math.min(20, Number(maxTotalInput.value || 6)));
+    settings.perDifferenceMax = pd;
+    settings.overallMax = mx;
+
+    // apply immediately
+    updateKpis();
+    settingsBackdrop.classList.remove("open");
+    settingsBackdrop.setAttribute("aria-hidden", "true");
+
+    // If the new max is now below askedCount, stop and reveal
+    if (state.running && state.askedCount >= settings.overallMax){
+      setUIStopped("Stopped (max questions)");
+      state.running = false;
+      reveal("settings reduced max");
+    }
+  });
+
+  function resetAll(){
+    state.running = false;
+    state.askedCount = 0;
+    state.perDiffCount = {};
+    state.lastMissingId = null;
+    state.currentQuestion = "";
+    state.revealed = false;
+    state.planIndex = 0;
+    state.questionIndexByFact = {};
+
+
+    askPanel.style.display = "";
+    draftPanel.style.display = "none";
+    checkPanel.style.display = "none";
+    revealBtn.disabled = true;
+
+    phaseTitle.textContent = "Step 1: Enter a question";
+    phaseSub.textContent = "You’ll get one neutral check at a time.";
+    statusLine.textContent = "Ask a question to begin";
+
+    // default reading posture
+    pdfBody.classList.add("blurIrrelevant");
+    contextCard.classList.remove("open");
+    contextToggleBtn.textContent = "Open";
+
+    // defaults
+    questionInput.value =
+      "What conditions make a Raft leader election safe, and how does Raft ensure logs do not diverge?";
+  }
+
+  // Boot
+  resetAll();
+</script>
+</body>
+</html>
+
